@@ -2,6 +2,28 @@
 
 All entries reference commits visible on `main`. Dates are UTC.
 
+## 0.3.0 — 2026-09-04
+
+### Added
+- `precision_at_k()` and `r_precision()` metric APIs with explicit
+  `MEASURED`/`INVALID` results.
+- P@k and R-precision in every measured lane's per-query output and aggregate,
+  the JSON demo, comparison leaderboard, and hash-chained receipt snapshot.
+- Reference-fixture, invalid-edge, malformed-input, no-overlap, cutoff-fairness,
+  CLI-output, and receipt-schema coverage.
+
+### Changed
+- Metric cutoff labels now reflect the requested `k`; comparisons reject
+  mixed cutoffs as unfair.
+- Duplicate ranking identifiers cannot inflate P@k or R-precision.
+- Package license metadata uses the current SPDX format.
+- GitHub Actions are pinned to full commit SHAs to satisfy organization policy.
+
+### Guarantees
+- Non-positive or non-integer P@k cutoffs are `INVALID`.
+- R-precision with no relevant documents is `INVALID` because it is undefined.
+- A valid zero-overlap ranking is retained as `MEASURED` at `0.0`.
+
 ## 0.2.0 — 2026-09-03
 
 ### Added
