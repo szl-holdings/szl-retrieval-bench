@@ -8,22 +8,54 @@ import time
 from .bm25 import BM25
 from .dense import TfidfDense
 from .fuse import rrf
-from .metrics import average_precision, mrr, ndcg, recall_at
+from .metrics import (
+    average_precision,
+    mrr,
+    ndcg,
+    precision_at_k,
+    r_precision,
+    recall_at,
+)
 from .receipts import ReceiptChain
 
 STATES = ("MEASURED", "BLOCKED", "INVALID", "FAILED")
 
 
 def evaluate_run(run, qrels, k=10):
-    return {"ndcg@10": round(ndcg(run, qrels, k), 4),
-            "recall@10": round(recall_at(run, qrels, k), 4),
-            "mrr": round(mrr(run, qrels), 4),
-            "map": round(average_precision(run, qrels), 4)}
+    relevant = {document for document, grade in qrels.items() if grade > 0}
+    precision = precision_at_k(run, relevant, k)
+    if precision["state"] != "MEASURED":
+        return precision
+    r_value = r_precision(run, relevant)
+    if r_value["state"] != "MEASURED":
+        return r_value
+    return {
+        "state": "MEASURED",
+        f"ndcg@{k}": round(ndcg(run, qrels, k), 4),
+        f"recall@{k}": round(recall_at(run, qrels, k), 4),
+        f"P@{k}": precision[f"P@{k}"],
+        "R_precision": r_value["R_precision"],
+        "mrr": round(mrr(run, qrels), 4),
+        "map": round(average_precision(run, qrels), 4),
+    }
 
 
 def _aggregate(per_query):
-    return {m: round(sum(r[m] for r in per_query.values()) / len(per_query), 4)
-            for m in next(iter(per_query.values()))}
+    first = next(iter(per_query.values()))
+    metrics = [name for name, value in first.items()
+               if name != "state" and isinstance(value, (int, float))]
+    return {name: round(sum(row[name] for row in per_query.values()) / len(per_query), 4)
+            for name in metrics}
+
+
+def _invalid_evaluation(per_query):
+    for query_id, result in per_query.items():
+        if result.get("state") != "MEASURED":
+            return {
+                "state": "INVALID",
+                "reason": f"query {query_id}: {result.get('detail', 'metric evaluation failed')}",
+            }
+    return None
 
 
 def run_bm25(corpus, queries, qrels, k=10):
@@ -37,6 +69,9 @@ def run_bm25(corpus, queries, qrels, k=10):
     for qid, qtext in queries.items():
         run = bm.rank(qtext, doc_ids)
         per_query[qid] = evaluate_run(run, qrels.get(qid, {}), k)
+    invalid = _invalid_evaluation(per_query)
+    if invalid:
+        return invalid
     elapsed = time.perf_counter() - t0
     return {"state": "MEASURED", "lane": "bm25", "k": k, "queries": len(per_query),
             "corpus_size": len(doc_ids), "elapsed_s": round(elapsed, 4),
@@ -53,6 +88,9 @@ def run_dense(corpus, queries, qrels, k=10):
     for qid, qtext in queries.items():
         run = dense.rank(qtext, doc_ids)
         per_query[qid] = evaluate_run(run, qrels.get(qid, {}), k)
+    invalid = _invalid_evaluation(per_query)
+    if invalid:
+        return invalid
     return {"state": "MEASURED", "lane": "tfidf-dense", "k": k, "queries": len(per_query),
             "corpus_size": len(doc_ids), "aggregate": _aggregate(per_query),
             "per_query": per_query}
@@ -68,6 +106,9 @@ def run_hybrid(corpus, queries, qrels, dense_rank_fn=None, k=10):
     for qid, qtext in queries.items():
         fused = rrf([bm.rank(qtext, doc_ids), dense_rank_fn(qtext, doc_ids)])
         per_query[qid] = evaluate_run(fused, qrels.get(qid, {}), k)
+    invalid = _invalid_evaluation(per_query)
+    if invalid:
+        return invalid
     return {"state": "MEASURED", "lane": "hybrid_rrf", "k": k, "queries": len(per_query),
             "aggregate": _aggregate(per_query), "per_query": per_query}
 
@@ -80,8 +121,12 @@ def compare(runs, chain=None):
     qsets = [frozenset(r["per_query"]) for r in measured]
     if len(set(qsets)) != 1:
         return {"state": "INVALID", "reason": "query sets differ across runs; comparison is unfair"}
+    cutoffs = {r["k"] for r in measured}
+    if len(cutoffs) != 1:
+        return {"state": "INVALID", "reason": "metric cutoffs differ across runs; comparison is unfair"}
     board = [{"lane": r["lane"], **r["aggregate"]} for r in measured]
-    board.sort(key=lambda r: -r["ndcg@10"])
+    score_key = f"ndcg@{next(iter(cutoffs))}"
+    board.sort(key=lambda row: -row[score_key])
     result = {"state": "MEASURED", "leaderboard": board, "winner": board[0]["lane"]}
     if chain is not None:
         snapshot = {"state": result["state"], "winner": result["winner"],

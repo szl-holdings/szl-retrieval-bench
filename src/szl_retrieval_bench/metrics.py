@@ -1,5 +1,60 @@
-"""Ranking metrics: nDCG@k, Recall@k, MRR, MAP. Conventions match TREC/BEIR."""
+"""Ranking metrics: nDCG@k, Recall@k, P@k, R-precision, MRR, and MAP."""
 import math
+
+
+def _document_ids(values, name):
+    """Return hashable document IDs or a fail-closed validation detail."""
+    if values is None or isinstance(values, (str, bytes)):
+        return None, f"{name} must be an iterable of document identifiers"
+    try:
+        documents = list(values)
+        set(documents)
+    except (TypeError, ValueError):
+        return None, f"{name} must be an iterable of hashable document identifiers"
+    return documents, None
+
+
+def precision_at_k(ranked, relevant, k):
+    """Return measured precision at exactly ``k`` ranking positions.
+
+    The denominator remains ``k`` when a run is shorter than the requested
+    cutoff, matching the conventional P@k definition. A ranking with no hits
+    is a valid measurement and is reported as ``0.0``.
+    """
+    if isinstance(k, bool) or not isinstance(k, int) or k < 1:
+        return {"state": "INVALID", "detail": "k must be >= 1"}
+    ranked_docs, error = _document_ids(ranked, "ranked")
+    if error:
+        return {"state": "INVALID", "detail": error}
+    relevant_docs, error = _document_ids(relevant, "relevant")
+    if error:
+        return {"state": "INVALID", "detail": error}
+    relevant_set = set(relevant_docs)
+    hits = len(set(ranked_docs[:k]) & relevant_set)
+    return {"state": "MEASURED", f"P@{k}": round(hits / k, 4)}
+
+
+def r_precision(ranked, relevant):
+    """Return precision at R, where R is the number of relevant documents."""
+    ranked_docs, error = _document_ids(ranked, "ranked")
+    if error:
+        return {"state": "INVALID", "detail": error}
+    relevant_docs, error = _document_ids(relevant, "relevant")
+    if error:
+        return {"state": "INVALID", "detail": error}
+    relevant_set = set(relevant_docs)
+    total_relevant = len(relevant_set)
+    if total_relevant == 0:
+        return {
+            "state": "INVALID",
+            "detail": "no relevant docs - R-precision undefined",
+        }
+    hits = len(set(ranked_docs[:total_relevant]) & relevant_set)
+    return {
+        "state": "MEASURED",
+        "R_precision": round(hits / total_relevant, 4),
+        "R": total_relevant,
+    }
 
 
 def _dcg(rels, k):
