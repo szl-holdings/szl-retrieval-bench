@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "szl-retrieval-bench"
-version = "0.1.0"
-description = "Honest retrieval benchmark lane: BM25, RRF hybrid, nDCG/Recall/MRR/MAP, fairness gates, hash-chained receipts. Fail closed."
+version = "0.2.0"
+description = "Honest retrieval benchmark lane: BM25, TF-IDF dense, RRF hybrid, nDCG/Recall/MRR/MAP, fairness gates, hash-chained receipts. Fail closed."
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
 

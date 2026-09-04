@@ -6,6 +6,7 @@ import json
 import time
 
 from .bm25 import BM25
+from .dense import TfidfDense
 from .fuse import rrf
 from .metrics import average_precision, mrr, ndcg, recall_at
 from .receipts import ReceiptChain
@@ -20,6 +21,11 @@ def evaluate_run(run, qrels, k=10):
             "map": round(average_precision(run, qrels), 4)}
 
 
+def _aggregate(per_query):
+    return {m: round(sum(r[m] for r in per_query.values()) / len(per_query), 4)
+            for m in next(iter(per_query.values()))}
+
+
 def run_bm25(corpus, queries, qrels, k=10):
     """corpus: {doc_id: text}; queries: {qid: text}; qrels: {qid: {doc_id: grade}}."""
     if not corpus or not queries:
@@ -32,11 +38,24 @@ def run_bm25(corpus, queries, qrels, k=10):
         run = bm.rank(qtext, doc_ids)
         per_query[qid] = evaluate_run(run, qrels.get(qid, {}), k)
     elapsed = time.perf_counter() - t0
-    agg = {m: round(sum(r[m] for r in per_query.values()) / len(per_query), 4)
-           for m in next(iter(per_query.values()))}
     return {"state": "MEASURED", "lane": "bm25", "k": k, "queries": len(per_query),
             "corpus_size": len(doc_ids), "elapsed_s": round(elapsed, 4),
-            "aggregate": agg, "per_query": per_query}
+            "aggregate": _aggregate(per_query), "per_query": per_query}
+
+
+def run_dense(corpus, queries, qrels, k=10):
+    """Classical TF-IDF dense lane (cosine over L2-normalized vectors)."""
+    if not corpus or not queries:
+        return {"state": "BLOCKED", "reason": "empty corpus or query set"}
+    doc_ids = list(corpus)
+    dense = TfidfDense([corpus[d] for d in doc_ids])
+    per_query = {}
+    for qid, qtext in queries.items():
+        run = dense.rank(qtext, doc_ids)
+        per_query[qid] = evaluate_run(run, qrels.get(qid, {}), k)
+    return {"state": "MEASURED", "lane": "tfidf-dense", "k": k, "queries": len(per_query),
+            "corpus_size": len(doc_ids), "aggregate": _aggregate(per_query),
+            "per_query": per_query}
 
 
 def run_hybrid(corpus, queries, qrels, dense_rank_fn=None, k=10):
@@ -49,10 +68,8 @@ def run_hybrid(corpus, queries, qrels, dense_rank_fn=None, k=10):
     for qid, qtext in queries.items():
         fused = rrf([bm.rank(qtext, doc_ids), dense_rank_fn(qtext, doc_ids)])
         per_query[qid] = evaluate_run(fused, qrels.get(qid, {}), k)
-    agg = {m: round(sum(r[m] for r in per_query.values()) / len(per_query), 4)
-           for m in next(iter(per_query.values()))}
     return {"state": "MEASURED", "lane": "hybrid_rrf", "k": k, "queries": len(per_query),
-            "aggregate": agg, "per_query": per_query}
+            "aggregate": _aggregate(per_query), "per_query": per_query}
 
 
 def compare(runs, chain=None):
@@ -67,7 +84,9 @@ def compare(runs, chain=None):
     board.sort(key=lambda r: -r["ndcg@10"])
     result = {"state": "MEASURED", "leaderboard": board, "winner": board[0]["lane"]}
     if chain is not None:
-        result["receipt"] = chain.emit({"type": "comparison", "result": result})
+        snapshot = {"state": result["state"], "winner": result["winner"],
+                    "leaderboard": [dict(row) for row in board]}
+        result["receipt"] = chain.emit({"type": "comparison", "result": snapshot})
     return result
 
 
@@ -78,9 +97,14 @@ def main():
     qrels = {"q1": {"d1": 2, "d3": 1}, "q2": {"d4": 2}}
     chain = ReceiptChain()
     sparse = run_bm25(corpus, queries, qrels)
-    hybrid = run_hybrid(corpus, queries, qrels)  # no dense ranker -> honest BLOCKED
-    out = {"bm25": sparse, "hybrid": hybrid,
-           "chain_valid": chain.verify()}
+    dense_run = run_dense(corpus, queries, qrels)
+    doc_ids = list(corpus)
+    classical = TfidfDense([corpus[d] for d in doc_ids])
+    hybrid = run_hybrid(corpus, queries, qrels,
+                        dense_rank_fn=lambda q, ids: classical.rank(q, ids))
+    verdict = compare([sparse, dense_run, hybrid], chain)
+    out = {"bm25": sparse, "tfidf_dense": dense_run, "hybrid_rrf": hybrid,
+           "comparison": verdict, "chain_valid": chain.verify()}
     print(json.dumps(out, indent=2, ensure_ascii=False))
 
 

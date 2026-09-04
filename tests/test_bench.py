@@ -1,8 +1,9 @@
 import pytest
 
 from szl_retrieval_bench.bm25 import BM25
+from szl_retrieval_bench.dense import TfidfDense
 from szl_retrieval_bench.fuse import rrf
-from szl_retrieval_bench.harness import compare, run_bm25, run_hybrid
+from szl_retrieval_bench.harness import compare, run_bm25, run_dense, run_hybrid
 from szl_retrieval_bench.metrics import average_precision, mrr, ndcg, recall_at
 from szl_retrieval_bench.receipts import ReceiptChain
 
@@ -15,6 +16,17 @@ QRELS = {"q1": {"d1": 2, "d3": 1}, "q2": {"d4": 2}}
 def test_bm25_ranks_relevant_first():
     bm = BM25(list(CORPUS.values()))
     assert bm.rank("cat mat", list(CORPUS))[0] == "d1"
+
+
+def test_dense_ranks_relevant_first():
+    d = TfidfDense(list(CORPUS.values()))
+    assert d.rank("cat mat", list(CORPUS))[0] == "d1"
+
+
+def test_dense_vectors_are_l2_normalized():
+    d = TfidfDense(list(CORPUS.values()))
+    for v in d.vectors:
+        assert sum(x * x for x in v.values()) == pytest.approx(1.0)
 
 
 def test_metrics_perfect_run():
@@ -41,9 +53,23 @@ def test_bm25_run_measured():
     assert r["state"] == "MEASURED" and r["aggregate"]["ndcg@10"] == 1.0
 
 
+def test_dense_run_measured():
+    r = run_dense(CORPUS, QUERIES, QRELS)
+    assert r["state"] == "MEASURED" and r["lane"] == "tfidf-dense"
+    assert r["aggregate"]["ndcg@10"] == 1.0
+
+
 def test_hybrid_blocked_without_dense():
     r = run_hybrid(CORPUS, QUERIES, QRELS)
     assert r["state"] == "BLOCKED" and "refusing" in r["reason"]
+
+
+def test_hybrid_measured_with_dense():
+    doc_ids = list(CORPUS)
+    d = TfidfDense([CORPUS[x] for x in doc_ids])
+    r = run_hybrid(CORPUS, QUERIES, QRELS, dense_rank_fn=lambda q, ids: d.rank(q, ids))
+    assert r["state"] == "MEASURED" and r["lane"] == "hybrid_rrf"
+    assert r["aggregate"]["ndcg@10"] == 1.0
 
 
 def test_compare_needs_two_measured():
@@ -55,6 +81,18 @@ def test_compare_rejects_mismatched_queries():
     a = run_bm25(CORPUS, QUERIES, QRELS)
     b = run_bm25(CORPUS, {"q1": "cat mat"}, {"q1": QRELS["q1"]})
     assert compare([a, b])["state"] == "INVALID"
+
+
+def test_compare_three_lane_leaderboard():
+    a = run_bm25(CORPUS, QUERIES, QRELS)
+    b = run_dense(CORPUS, QUERIES, QRELS)
+    doc_ids = list(CORPUS)
+    d = TfidfDense([CORPUS[x] for x in doc_ids])
+    c = run_hybrid(CORPUS, QUERIES, QRELS, dense_rank_fn=lambda q, ids: d.rank(q, ids))
+    chain = ReceiptChain()
+    v = compare([a, b, c], chain)
+    assert v["state"] == "MEASURED" and len(v["leaderboard"]) == 3
+    assert "receipt" in v and chain.verify()
 
 
 def test_receipt_chain_verifies_and_detects_tamper():
