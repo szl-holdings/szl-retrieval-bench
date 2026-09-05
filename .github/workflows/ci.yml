@@ -9,6 +9,7 @@ permissions:
 concurrency:
   group: retrieval-witness-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
+  queue: max
 jobs:
   test:
     runs-on: ubuntu-latest
