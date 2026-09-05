@@ -1,18 +1,60 @@
 name: ci
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
+  actions: read
+concurrency:
+  group: retrieval-witness-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+  queue: max
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
+      fail-fast: false
+    env:
+      WITNESS_STREAM: ${{ github.workflow }}:${{ github.ref }}:python-${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -e . pytest
-      - run: python -m pytest tests/ -q
-      - run: python -m szl_retrieval_bench.harness
+      - name: Install reviewed witness implementation
+        run: pip install -e . pytest 'szl-ci-witness @ git+https://github.com/szl-holdings/szl-ci-witness.git@ea5fa4839cefa5127af770e801a8b487e278afe5'
+      - name: Restore and verify predecessor
+        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/')
+        id: restore
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m szl_ci_witness.github_artifacts
+      - name: Test and run the bundled retrieval fixture
+        id: test
+        run: |
+          python -m pytest tests/ -q --junitxml=test-results.xml
+          python -m szl_retrieval_bench.harness > benchmark-results.json
+          python -c "import json; r=json.load(open('benchmark-results.json')); assert r['chain_valid'] is True; assert all(r[k]['state']=='MEASURED' for k in ('bm25','tfidf_dense','hybrid_rrf','comparison'))"
+      - name: Witness the actual test-step outcome
+        if: always() && steps.restore.outcome == 'success'
+        id: witness
+        env:
+          TEST_CONCLUSION: ${{ steps.test.outcome }}
+        run: |
+          python -m szl_ci_witness.witness record-junit --conclusion "$TEST_CONCLUSION"
+          python -m szl_ci_witness.witness verify
+          python -m szl_ci_witness.witness summary
+      - name: Retain witness and measured reports
+        if: always() && steps.witness.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.restore.outputs.artifact_name }}
+          path: |
+            ci-witness.jsonl
+            test-results.xml
+            benchmark-results.json
+          if-no-files-found: error
+          retention-days: 90
