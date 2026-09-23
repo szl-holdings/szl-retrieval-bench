@@ -49,13 +49,19 @@ aggregates, and receipts.
   Calling it without a dense ranker returns `BLOCKED`, by design.
 - `compare` — fairness gate: runs covering different query sets are `INVALID`.
 - Receipts — every comparison can emit a SHA-256 hash-chained
-  `UNSIGNED_HONEST` receipt (integrity + order, not identity).
+  `UNSIGNED_HONEST` receipt. The receipt hashes the source harness declaration
+  `szl-retrieval-bench` so downstream aggregators can reject relabelling.
+  This is a hashed source declaration, not issuer authentication: the chain
+  proves integrity + order of its contents, not who produced them.
 
 Multi-vector / late-interaction (ColBERT-style) lives in a separate lane:
 different memory profile, different fairness constraints. Not mixed here.
 
 ## Changelog highlights
 
+- current: comparison receipts bind the `szl-retrieval-bench` harness name in
+  the hashed payload so Wave 1 consolidation can verify source declaration
+  without inferring identity from a filename or caller-supplied label.
 - v0.3.0: P@k and R-precision added to the metric API, all measured lanes,
   demo output, aggregate leaderboards, and hash-chained comparison receipts;
   invalid cutoffs and undefined R-precision fail closed.
