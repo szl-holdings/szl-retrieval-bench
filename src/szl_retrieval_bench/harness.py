@@ -19,6 +19,7 @@ from .metrics import (
 from .receipts import ReceiptChain
 
 STATES = ("MEASURED", "BLOCKED", "INVALID", "FAILED")
+HARNESS = "szl-retrieval-bench"
 
 
 def evaluate_run(run, qrels, k=10):
@@ -131,7 +132,8 @@ def compare(runs, chain=None):
     if chain is not None:
         snapshot = {"state": result["state"], "winner": result["winner"],
                     "leaderboard": [dict(row) for row in board]}
-        result["receipt"] = chain.emit({"type": "comparison", "result": snapshot})
+        result["receipt"] = chain.emit({"harness": HARNESS, "type": "comparison",
+                                        "result": snapshot})
     return result
 
 
