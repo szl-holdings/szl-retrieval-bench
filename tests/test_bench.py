@@ -5,7 +5,7 @@ import pytest
 from szl_retrieval_bench.bm25 import BM25
 from szl_retrieval_bench.dense import TfidfDense
 from szl_retrieval_bench.fuse import rrf
-from szl_retrieval_bench.harness import compare, main, run_bm25, run_dense, run_hybrid
+from szl_retrieval_bench.harness import HARNESS, compare, main, run_bm25, run_dense, run_hybrid
 from szl_retrieval_bench.metrics import (
     average_precision,
     mrr,
@@ -164,8 +164,11 @@ def test_compare_three_lane_leaderboard():
     v = compare([a, b, c], chain)
     assert v["state"] == "MEASURED" and len(v["leaderboard"]) == 3
     assert "receipt" in v and chain.verify()
+    assert v["receipt"]["run"]["harness"] == HARNESS
     receipt_board = v["receipt"]["run"]["result"]["leaderboard"]
     assert all("P@10" in row and "R_precision" in row for row in receipt_board)
+    v["receipt"]["run"]["harness"] = "other-harness"
+    assert not chain.verify()
 
 
 def test_compare_rejects_mismatched_metric_cutoffs():
@@ -184,6 +187,7 @@ def test_demo_cli_prints_new_metrics_and_verifiable_receipt(capsys):
     for lane in ("bm25", "tfidf_dense", "hybrid_rrf"):
         assert "P@10" in output[lane]["aggregate"]
         assert "R_precision" in output[lane]["aggregate"]
+    assert output["comparison"]["receipt"]["run"]["harness"] == HARNESS
     receipt_board = output["comparison"]["receipt"]["run"]["result"]["leaderboard"]
     assert all("P@10" in row and "R_precision" in row for row in receipt_board)
 
