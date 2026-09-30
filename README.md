@@ -40,7 +40,42 @@ aggregates, and receipts.
 
 ## Lanes
 
-- `bm25` — stdlib BM25 (k1=1.5, b=0.75). No downloads, no network.
+### Synthetic answer fixtures
+
+`python -m szl_retrieval_bench.fixture` scores only caller-supplied synthetic
+question/answer fixtures with `fixture_exact_match_v1`: NFC normalization,
+casefolding, collapsed Unicode whitespace, and strict equality retaining
+punctuation and signs. It does not run retrieval, generation, or a provider.
+External performance remains `UNMEASURED`; this is not an official LongMemEval,
+LoCoMo, or STATE-Bench evaluation. The existing ranking APIs are unchanged.
+
+Use a JSON array of `{question_id, question, answer}` objects and JSONL
+`{question_id, hypothesis}` predictions, with unique nonempty string IDs:
+
+```sh
+python -m szl_retrieval_bench.fixture --dataset fixture.questions.json \
+  --dataset-variant fixture --predictions fixture.predictions.jsonl \
+  --system synthetic --judge fixture_exact_match_v1 --out fixture-receipts
+```
+
+Missing predictions count as incorrect; empty datasets, empty prediction sets,
+all-empty hypotheses, duplicate/unknown IDs, malformed JSON, and unsupported
+judge/dataset modes raise errors. Inputs are capped at 1 MiB and 1,000 rows.
+The legacy `exact` option aliases strict fixture equality, never substring matching.
+
+Each unique output directory retains input/source snapshots, verdicts, and an
+unsigned hash-bound receipt. `fixture.verify_receipt(path,
+expected_evaluator_sha256=trusted_digest)` recomputes consistency and optionally
+checks an independently obtained source digest. It never executes the snapshot.
+Unsigned coordinated rewrites are not authenticated evidence. Normal imports
+honestly label source identity as an unverified file snapshot. Output and input
+parents must be private, caller-owned local directories: portable link checks
+do not defeat concurrent hostile directory replacement. See
+[integration provenance](docs/fixture-provenance.md) for coverage and limits.
+
+### Retrieval ranking
+
+- `bm25` - stdlib BM25 (k1=1.5, b=0.75). No downloads, no network.
 - `tfidf-dense` — classical dense retrieval: L2-normalized TF-IDF vectors,
   cosine similarity. Real dense-vector math, deterministic, honestly labeled
   classical (not a neural embedding). A neural adapter plugs into the same
