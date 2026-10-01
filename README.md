@@ -1,5 +1,7 @@
 # szl-retrieval-bench
 
+[![PyPI](https://img.shields.io/pypi/v/szl-retrieval-bench)](https://pypi.org/project/szl-retrieval-bench/) [![Python](https://img.shields.io/pypi/pyversions/szl-retrieval-bench)](https://pypi.org/project/szl-retrieval-bench/)
+
 Honest retrieval benchmark lane for the SZL estate. Sparse BM25 baseline,
 classical TF-IDF dense lane, RRF hybrid fusion, and ranking metrics
 (nDCG@k, Recall@k, P@k, R-precision, MRR, MAP) with fairness gates and
