@@ -1,6 +1,6 @@
 # szl-retrieval-bench
 
-[![PyPI](https://img.shields.io/pypi/v/szl-retrieval-bench)](https://pypi.org/project/szl-retrieval-bench/) [![Python](https://img.shields.io/pypi/pyversions/szl-retrieval-bench)](https://pypi.org/project/szl-retrieval-bench/)
+[![PyPI](https://img.shields.io/pypi/v/szl-retrieval-bench)](https://pypi.org/project/szl-retrieval-bench/) [![Python](https://img.shields.io/pypi/pyversions/szl-retrieval-bench)](https://pypi.org/project/szl-retrieval-bench/) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/szl-holdings/szl-retrieval-bench/badge)](https://scorecard.dev/viewer/?uri=github.com/szl-holdings/szl-retrieval-bench)
 
 Honest retrieval benchmark lane for the SZL estate. Sparse BM25 baseline,
 classical TF-IDF dense lane, RRF hybrid fusion, and ranking metrics
