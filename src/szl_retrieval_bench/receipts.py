@@ -3,11 +3,28 @@ import hashlib
 import json
 import time
 
+# Both paths preserve this organ's UTF-8 canonical bytes for valid JSON.
+# An absent optional package uses the local implementation; a broken installed
+# package must fail visibly rather than silently changing the implementation.
+try:
+    from szl_evidence_core.canonical import CANON_UTF8 as _CANON_PROFILE
+    from szl_evidence_core.canonical import canonical_json as _shared_canonical_json
+except ModuleNotFoundError as exc:
+    if exc.name != "szl_evidence_core":
+        raise
+    _CANON_PROFILE = "szl.lambda/v1"
+    _shared_canonical_json = None
+
+
 GENESIS = "0" * 64
 
 
 def _canonical(obj):
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    if _shared_canonical_json is not None:
+        return _shared_canonical_json(obj, profile=_CANON_PROFILE, check=False)
+    return json.dumps(
+        obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+    )
 
 
 class ReceiptChain:
