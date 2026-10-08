@@ -1,5 +1,6 @@
 """Ranking metrics: nDCG@k, Recall@k, P@k, R-precision, MRR, and MAP."""
 import math
+from collections.abc import Mapping
 
 
 def _document_ids(values, name):
@@ -12,6 +13,33 @@ def _document_ids(values, name):
     except (TypeError, ValueError):
         return None, f"{name} must be an iterable of hashable document identifiers"
     return documents, None
+
+
+def _unique_ranking(values):
+    """Materialize an ordered ranking; one document can occupy only one rank."""
+    if isinstance(values, (Mapping, set, frozenset)):
+        raise ValueError("run must be an ordered iterable of document identifiers")
+    documents, error = _document_ids(values, "run")
+    if error:
+        raise ValueError(error)
+    if len(set(documents)) != len(documents):
+        raise ValueError("run contains duplicate document identifiers")
+    return documents
+
+
+def _relevance_grades(qrels):
+    if not isinstance(qrels, Mapping):
+        raise ValueError("qrels must map document identifiers to relevance grades")
+    snapshot = dict(qrels)
+    for grade in snapshot.values():
+        try:
+            valid = (not isinstance(grade, bool) and isinstance(grade, (int, float))
+                     and math.isfinite(grade) and grade >= 0)
+        except OverflowError:
+            valid = False
+        if not valid:
+            raise ValueError("relevance grades must be finite nonnegative numbers")
+    return snapshot
 
 
 def precision_at_k(ranked, relevant, k):
@@ -62,6 +90,8 @@ def _dcg(rels, k):
 
 
 def ndcg(run, qrels, k=10):
+    run = _unique_ranking(run)
+    qrels = _relevance_grades(qrels)
     rels = [qrels.get(d, 0) for d in run[:k]]
     ideal = sorted(qrels.values(), reverse=True)[:k]
     denom = _dcg(ideal, k)
@@ -81,6 +111,8 @@ def mrr(run, qrels):
 
 
 def average_precision(run, qrels):
+    run = _unique_ranking(run)
+    qrels = _relevance_grades(qrels)
     rel = {d for d, r in qrels.items() if r > 0}
     if not rel:
         return 0.0

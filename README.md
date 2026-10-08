@@ -40,6 +40,13 @@ returned. `k < 1` or a non-integer cutoff is `INVALID`; R-precision is
 overlap is `MEASURED` at `0.0` and remains present in per-query output,
 aggregates, and receipts.
 
+Complete or partial rankings must contain each document at most once.
+`evaluate_run` rejects duplicate rankings as `INVALID`; direct `ndcg` and
+`average_precision` calls raise `ValueError` for duplicates. This prevents
+the same relevant document from inflating gain or average precision above
+one. The standalone set-based P@k and R-precision APIs retain their existing
+duplicate-counting behavior: repeated IDs never add another hit.
+
 ## Lanes
 
 ### Synthetic answer fixtures
@@ -84,18 +91,34 @@ do not defeat concurrent hostile directory replacement. See
   `rank(query, doc_ids)` interface without touching the harness.
 - `hybrid_rrf` — RRF(k=60) fusion of BM25 and a pluggable dense ranker.
   Calling it without a dense ranker returns `BLOCKED`, by design.
-- `compare` — fairness gate: runs covering different query sets are `INVALID`.
+  Each input ranking must have unique IDs. Hybrid adapter output must name
+  only documents from the supplied corpus; malformed output is `INVALID`.
+- `compare` — fairness gate: runs must have distinct `run_id` values and
+  identical query sets, cutoffs, and `input_fingerprints`. Every measured
+  lane records the `szl.retrieval-bench.inputs/v1` schema and SHA-256 digests
+  of its ordered corpus, ordered query texts, and relevance judgments.
+  These fingerprints are computed from the private snapshots used during
+  evaluation, before calling an adapter. Corpus order is included because
+  it determines stable tie breaks. Missing bindings, changed texts/qrels,
+  or replayed run IDs make a comparison `INVALID`; older unbound results
+  must be rerun before comparison.
 - Receipts — every comparison can emit a SHA-256 hash-chained
   `UNSIGNED_HONEST` receipt. The receipt hashes the source harness declaration
-  `szl-retrieval-bench` so downstream aggregators can reject relabelling.
+  `szl-retrieval-bench`, input fingerprints, cutoff, run IDs, and leaderboard
+  so downstream aggregators can detect changes to those recorded fields.
   This is a hashed source declaration, not issuer authentication: the chain
   proves integrity + order of its contents, not who produced them.
+  A caller able to fabricate or rewrite every field can still fabricate
+  an unsigned record; fingerprints do not certify ranking quality or prove
+  that an external adapter used the declared corpus/model.
 
 Multi-vector / late-interaction (ColBERT-style) lives in a separate lane:
 different memory profile, different fairness constraints. Not mixed here.
 
 ## Changelog highlights
 
+- current: reject duplicate ranking inflation and bind comparisons to
+  ordered evaluation input fingerprints and distinct run IDs.
 - current: comparison receipts bind the `szl-retrieval-bench` harness name in
   the hashed payload so Wave 1 consolidation can verify source declaration
   without inferring identity from a filename or caller-supplied label.
