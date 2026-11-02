@@ -253,12 +253,12 @@ def compare(runs, chain=None):
             return {"state": "INVALID", "reason": "runs must contain result mappings"}
         if run.get("state") == "MEASURED":
             measured.append(run)
-    if len(measured) < 2:
-        return {"state": "BLOCKED", "reason": "fewer than two MEASURED runs to compare"}
     for run in measured:
         error = _comparison_payload_error(run)
         if error:
             return {"state": "INVALID", "reason": error}
+    if len(measured) < 2:
+        return {"state": "BLOCKED", "reason": "fewer than two MEASURED runs to compare"}
     qsets = [frozenset(r["per_query"]) for r in measured]
     if len(set(qsets)) != 1:
         return {"state": "INVALID", "reason": "query sets differ across runs; comparison is unfair"}

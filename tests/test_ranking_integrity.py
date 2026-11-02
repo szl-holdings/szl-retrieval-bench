@@ -132,6 +132,26 @@ def test_comparison_rejects_non_mapping_result():
     assert compare([run_bm25(*inputs()), None])["state"] == "INVALID"
 
 
+@pytest.mark.parametrize("blocked_peer", [False, True])
+@pytest.mark.parametrize("malformation", ["shape", "score"])
+def test_single_malformed_measurement_is_invalid_before_count_gate(blocked_peer, malformation):
+    run = run_bm25(*inputs())
+    if malformation == "shape":
+        run["per_query"] = None
+    else:
+        run["aggregate"]["ndcg@10"] = float("nan")
+    runs = [run, {"state": "BLOCKED"}] if blocked_peer else [run]
+    chain = ReceiptChain()
+    assert compare(runs, chain)["state"] == "INVALID"
+    assert chain.chain == []
+
+
+def test_single_valid_measurement_still_blocks_without_a_comparison_receipt():
+    chain = ReceiptChain()
+    assert compare([run_bm25(*inputs()), {"state": "BLOCKED"}], chain)["state"] == "BLOCKED"
+    assert chain.chain == []
+
+
 def test_compare_rejects_missing_input_binding():
     first = run_bm25(*inputs())
     second = run_dense(*inputs())
