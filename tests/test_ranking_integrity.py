@@ -87,6 +87,51 @@ def test_compare_rejects_replayed_run_id():
     assert "duplicate run IDs" in result["reason"]
 
 
+@pytest.mark.parametrize("identity", ["lane", "run_id"])
+def test_aggregate_cannot_override_verified_run_identity(identity):
+    first = run_bm25(*inputs())
+    second = run_dense(*inputs())
+    first["aggregate"][identity] = "forged-identity"
+    chain = ReceiptChain()
+    result = compare([first, second], chain)
+    assert result["state"] == "INVALID"
+    assert chain.chain == []
+
+
+@pytest.mark.parametrize("score", [float("nan"), float("inf"), -0.1, 1.1, True, "1"])
+@pytest.mark.parametrize("location", ["aggregate", "per_query"])
+def test_comparison_rejects_invalid_scores_without_emitting_receipt(score, location):
+    first = run_bm25(*inputs())
+    second = run_dense(*inputs())
+    metrics = first["aggregate"] if location == "aggregate" else first["per_query"]["q1"]
+    metrics["ndcg@10"] = score
+    chain = ReceiptChain()
+    assert compare([first, second], chain)["state"] == "INVALID"
+    assert chain.chain == []
+
+
+def test_comparison_rejects_aggregate_disagreement_with_query_evidence():
+    first = run_bm25(*inputs())
+    second = run_dense(*inputs())
+    first["aggregate"]["ndcg@10"] = 0.25
+    assert compare([first, second])["state"] == "INVALID"
+
+
+@pytest.mark.parametrize("field,value", [
+    ("k", []), ("k", True), ("lane", None), ("per_query", None),
+    ("per_query", {}), ("per_query", {"q1": None}), ("aggregate", None),
+])
+def test_comparison_rejects_malformed_run_payloads(field, value):
+    first = run_bm25(*inputs())
+    second = run_dense(*inputs())
+    first[field] = value
+    assert compare([first, second])["state"] == "INVALID"
+
+
+def test_comparison_rejects_non_mapping_result():
+    assert compare([run_bm25(*inputs()), None])["state"] == "INVALID"
+
+
 def test_compare_rejects_missing_input_binding():
     first = run_bm25(*inputs())
     second = run_dense(*inputs())
