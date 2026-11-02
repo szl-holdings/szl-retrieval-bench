@@ -213,9 +213,50 @@ def run_hybrid(corpus, queries, qrels, dense_rank_fn=None, k=10):
             "aggregate": _aggregate(per_query), "per_query": per_query}
 
 
+def _comparison_payload_error(run):
+    """Check metric shape and consistency, not the run producer's identity."""
+    k = run.get("k")
+    if isinstance(k, bool) or not isinstance(k, int) or k < 1:
+        return "metric cutoff must be a positive integer"
+    if not isinstance(run.get("lane"), str) or not run["lane"]:
+        return "lane must be a nonempty string"
+    metrics = {f"ndcg@{k}", f"recall@{k}", f"P@{k}", "R_precision", "mrr", "map"}
+    per_query = run.get("per_query")
+    if not isinstance(per_query, Mapping) or not per_query:
+        return "per_query must contain measured query results"
+    for query_id, row in per_query.items():
+        if not isinstance(query_id, str) or not query_id:
+            return "query IDs must be nonempty strings"
+        if (not isinstance(row, Mapping) or set(row) != metrics | {"state"}
+                or row.get("state") != "MEASURED"):
+            return "per_query metric schema is invalid"
+        if any(isinstance(row[key], bool) or not isinstance(row[key], (int, float))
+               or not 0 <= row[key] <= 1 for key in metrics):
+            return "query metrics must be finite numbers between zero and one"
+    aggregate = run.get("aggregate")
+    if not isinstance(aggregate, Mapping) or set(aggregate) != metrics:
+        return "aggregate metric schema is invalid"
+    if any(isinstance(aggregate[key], bool)
+           or not isinstance(aggregate[key], (int, float))
+           or not 0 <= aggregate[key] <= 1 for key in metrics):
+        return "aggregate metrics must be finite numbers between zero and one"
+    if aggregate != _aggregate(per_query):
+        return "aggregate metrics do not match per_query evidence"
+    return None
+
+
 def compare(runs, chain=None):
     """Compare distinct runs bound to identical ordered evaluation inputs."""
-    measured = [r for r in runs if r.get("state") == "MEASURED"]
+    measured = []
+    for run in runs:
+        if not isinstance(run, Mapping):
+            return {"state": "INVALID", "reason": "runs must contain result mappings"}
+        if run.get("state") == "MEASURED":
+            measured.append(run)
+    for run in measured:
+        error = _comparison_payload_error(run)
+        if error:
+            return {"state": "INVALID", "reason": error}
     if len(measured) < 2:
         return {"state": "BLOCKED", "reason": "fewer than two MEASURED runs to compare"}
     qsets = [frozenset(r["per_query"]) for r in measured]
