@@ -144,3 +144,9 @@ different memory profile, different fairness constraints. Not mixed here.
 - v0.1.0: BM25, RRF, metrics, fairness gates, receipts, CI.
 
 Apache-2.0 · Doctrine v11 · SZL Holdings
+
+Estate on Hugging Face: models, datasets and Spaces are published under the [SZLHOLDINGS](https://huggingface.co/SZLHOLDINGS) org.
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE).
