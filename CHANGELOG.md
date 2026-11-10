@@ -2,6 +2,18 @@
 
 All entries reference commits visible on `main`. Dates are UTC.
 
+## 0.3.2 — unreleased
+
+### Fixed
+
+- Validate comparison evidence before issuing receipts, bind comparisons to
+  their inputs, and reject duplicate rankings (#17, #22).
+- Enforce canonical JSON receipt parity when the optional shared core is used
+  (#15).
+- Align the public runtime version with distribution metadata.
+- Check installed distributions with isolated Python and verify dependency
+  consistency in the canonical release gate.
+
 ## 0.3.0 — 2026-09-04
 
 ### Added
