@@ -86,11 +86,9 @@ def evaluate_admission_ablation(
         return _invalid("evidence_flags must map every ranked document to four axis states")
     try:
         flags = dict(evidence_flags)
-        exact = set(flags) == set(ranked_docs)
+        if set(flags) != set(ranked_docs):
+            return _invalid("evidence flags must match exactly the ranked document IDs")
     except TypeError:
-        exact = False
-        flags = {}
-    if not exact:
         return _invalid("evidence flags must match exactly the ranked document IDs")
     for observation in flags.values():
         if (
