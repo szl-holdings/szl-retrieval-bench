@@ -62,6 +62,22 @@ duplicate-counting behavior: repeated IDs never add another hit.
 
 ## Lanes
 
+### Evidence-admission ablation (offline, source only)
+
+The optional `szl_retrieval_bench.admission.evaluate_admission_ablation`
+compares **the same fixed ranking and qrels** before and after a four-axis
+zero-veto filter (integrity, license, freshness, derivation). Every axis is
+a *caller-declared* `PASS | FAIL | UNKNOWN`—this adapter does not verify
+signatures, rights or timestamps, so its return state is
+`EVALUATED_OFFLINE`, never training or deployment authorization.
+
+It emits an input SHA-256 checksum (not a signature), candidate and relevance
+denominators, unknown/refused counts, and paired nDCG/Recall/P@k/R-precision/
+MRR/MAP deltas **even when the gate harms recall**. No qrels are used to
+choose admissions. [Research anchors, formulas, synthetic counterexample,
+adversarial tests, and remaining gates](docs/evidence-admission-ablation.md).
+Existing BM25, TF-IDF, RRF, CI release and provenance paths are unchanged.
+
 ### Synthetic answer fixtures
 
 `python -m szl_retrieval_bench.fixture` scores only caller-supplied synthetic
