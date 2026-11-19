@@ -6,7 +6,7 @@ imported by the normal retrieval package or local research CLI. No service
 binding, account routing, private source, training or inference is performed.
 A real deployment requires separate bundle and staging smoke verification.
 """
-from .hierarchy_web import application
+from szl_retrieval_bench.hierarchy_web import application
 from workers import wsgi
 
 Default = wsgi.entrypoint(application)
