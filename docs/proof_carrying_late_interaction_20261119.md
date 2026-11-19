@@ -50,7 +50,9 @@ With `n` query tokens, `d` vector dimensions and document lengths
 
 ```
 pairwise_cosine = n * sum_j(m_j)
-scalar_multiplications = d * pairwise_cosine
+cosine_dot_scalar_multiplications = d * pairwise_cosine
+query_weight_multiplications = n * document_count
+token_normalizations = n + sum_j(m_j)
 ```
 
 The model refuses a configured scalar-work budget before scoring. These are

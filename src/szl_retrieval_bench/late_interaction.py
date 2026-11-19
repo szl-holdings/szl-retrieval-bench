@@ -184,7 +184,7 @@ def _snapshot(
     return query, docs, labels, evidence, dim, scalar_ops
 
 
-def evaluate_late_interaction(
+def _evaluate_late_interaction_impl(
     query_tokens,
     documents,
     qrels,
@@ -311,7 +311,9 @@ def evaluate_late_interaction(
         "embedding_dimension": dim,
         "work": {
             "pairwise_cosine": scalar_ops // dim,
-            "scalar_multiplications": scalar_ops,
+            "cosine_dot_scalar_multiplications": scalar_ops,
+            "query_weight_multiplications": len(query) * len(docs),
+            "token_normalizations": len(query) + sum(len(t) for t in docs.values()),
             "pairs_shared_between_arms": True,
         },
         "ranking": {"unweighted": unweighted, "weighted": weighted},
@@ -332,3 +334,35 @@ def evaluate_late_interaction(
             "training authorization or production retrieval is implemented."
         ),
     }
+
+
+def evaluate_late_interaction(
+    query_tokens,
+    documents,
+    qrels,
+    *,
+    source_revision,
+    k=10,
+    max_scalar_products=MAX_SCALAR_PRODUCTS,
+    evidence_flags=None,
+):
+    """Fail closed on arithmetic errors; never expose partial rankings or vectors.
+
+    This is still an offline mathematical ablation, not execution authority.
+    """
+    try:
+        return _evaluate_late_interaction_impl(
+            query_tokens,
+            documents,
+            qrels,
+            source_revision=source_revision,
+            k=k,
+            max_scalar_products=max_scalar_products,
+            evidence_flags=evidence_flags,
+        )
+    except (ArithmeticError, ValueError):
+        return {
+            "state": "INVALID",
+            "reason_code": "INVALID_NUMERIC_ARITHMETIC",
+            "training_ready": False,
+        }

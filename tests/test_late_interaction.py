@@ -4,6 +4,7 @@
 from copy import deepcopy
 
 import pytest
+
 from szl_retrieval_bench.admission import AXES
 from szl_retrieval_bench.late_interaction import (
     MAX_DIM,
@@ -57,7 +58,9 @@ def test_weighted_importance_improves_rank_on_a_public_synthetic_fixture():
     assert r["metrics"]["weighted_minus_unweighted"]["mrr"] == 0.5
     assert r["work"] == {
         "pairwise_cosine": 4,
-        "scalar_multiplications": 8,
+        "cosine_dot_scalar_multiplications": 8,
+        "query_weight_multiplications": 4,
+        "token_normalizations": 4,
         "pairs_shared_between_arms": True,
     }
     assert r["signed_receipt_verified"] is False
@@ -250,3 +253,20 @@ def test_no_positive_judgments_are_blocked_not_reported_as_zeros():
     r = evaluate(qrels={"A": 0, "B": 0})
     assert r["state"] == "BLOCKED"
     assert "metrics" not in r
+
+
+def test_fault_injected_numeric_overflow_is_invalid_not_a_crash(monkeypatch):
+    # The actual finite input bounds avoid ordinary overflow; inject the
+    # numerical failure to prove this public API never escapes with partial data.
+    import szl_retrieval_bench.late_interaction as module
+
+    def overflow(_values):
+        raise OverflowError("synthetic numeric fault - do not echo values")
+
+    monkeypatch.setattr(module.math, "fsum", overflow)
+    result = evaluate()
+    assert result == {
+        "state": "INVALID",
+        "reason_code": "INVALID_NUMERIC_ARITHMETIC",
+        "training_ready": False,
+    }
