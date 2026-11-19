@@ -112,6 +112,25 @@ jobs:
           assert code == 400
           print("PYODIDE_WORKER_LOCAL_SMOKE_PASS", flush=True)
           PY
+      - name: Redacted bounded local workerd startup diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+          path = Path(os.environ["RUNNER_TEMP"]) / "atlas-pyodide.log"
+          if path.is_file():
+              lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[-90:]
+              for row in lines:
+                  if re.search(r"(token|password|secret|authorization|cookie|api.key|credential)", row, re.I):
+                      print("[redacted diagnostic line]")
+                  else:
+                      print(row[:300])
+          else:
+              print("WORKER_LOG_UNAVAILABLE")
+          PY
       - name: Summarize static gate (never proof of deployment)
         if: always()
         shell: bash
