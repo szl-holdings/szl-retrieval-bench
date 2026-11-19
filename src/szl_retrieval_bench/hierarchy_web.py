@@ -15,7 +15,6 @@ import html
 import json
 import re
 from urllib.parse import parse_qs
-from wsgiref.simple_server import make_server
 
 from .hierarchical import HierarchicalIndex, IndexRefused, VectorFact
 from .hierarchical_eval import compare_exact
@@ -125,8 +124,9 @@ def _params(environ: dict) -> tuple[list[float], str, int, int]:
 
 
 def _evaluate(vector: list[float], top_k: int, leaves: int) -> dict:
-    # Use the same strict-positive cosine predicate as compare_exact. This is
-    # not full signed-cosine nearest-neighbor search (an upstream limitation).
+    # Selection excludes zero/negative neighbors; the evaluation reference
+    # deliberately retains ALL signed-cosine neighbors. Their difference is
+    # a measured research limitation, not proof of missing global support.
     selection = INDEX.select(vector, tenant_id=TENANT, top_k=top_k,
                              max_leaf_visits=leaves, min_similarity=0.0)
     fidelity = compare_exact(
@@ -151,7 +151,7 @@ def _evaluate(vector: list[float], top_k: int, leaves: int) -> dict:
             "approximate_scored_vectors": fidelity["denominators"]["approximate_scored_vectors"],
             "reference_scored_vectors": fidelity["denominators"]["exact_scored_vectors"],
         },
-        "limits": "Synthetic, caller-declared facts only. Reference and selection both require strict cosine > 0. No external rights validation, model, full AtlasKV attention, speedup, or production security claim.",
+        "limits": "Synthetic, caller-declared facts only. Selection requires strict cosine > 0 while exact reference ranks signed cosine (including zero/negative neighbors). No external rights validation, model, full AtlasKV attention, speedup, or production security claim.",
     }
 
 
@@ -218,8 +218,8 @@ value="{leaves}" required>
 <p>Production readiness: <code>/readyz</code> returns HTTP 503.</p></section>
 </div>
 <footer>Python WSGI. No JavaScript, user accounts, private data,
-database writes or provider credentials. Similarity threshold excludes zero/negative
-scores; results are a research proxy, not full AtlasKV.</footer>
+database writes or provider credentials. Selection excludes zero/negative
+scores; the exact-cosine reference includes them. Research proxy only, not full AtlasKV.</footer>
 </main></body></html>"""
 
 
@@ -288,6 +288,10 @@ def main() -> None:
     args = parser.parse_args()
     if args.host != "127.0.0.1" or not 1024 <= args.port <= 65535:
         parser.error("research preview binds loopback and ports 1024..65535 only")
+    # Import socket-serving support only for explicit local CLI execution.
+    # Cloudflare's Pyodide Worker adapter must not import a socket listener.
+    from wsgiref.simple_server import make_server
+
     with make_server(args.host, args.port, application) as server:
         print(f"SYNTHETIC_RESEARCH_ONLY http://{args.host}:{args.port}/", flush=True)
         server.serve_forever()
