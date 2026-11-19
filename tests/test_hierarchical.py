@@ -150,3 +150,36 @@ def test_one_fact_index_works_with_default_query_budget():
     result = idx.select([1, 0], tenant_id="tenant-a")
     assert result["ranking"][0]["fact_id"] == "only"
     assert result["exhaustive"] is True
+
+
+def test_signed_cosine_reference_detects_antipodal_only_miss():
+    idx = HierarchicalIndex([fact("antipodal", [-1, 0])],
+                            tenant_id="tenant-a", leaf_size=1)
+    r = compare_exact(idx, {"query": (1, 0)}, tenant_id="tenant-a",
+                      top_k=1, max_leaf_visits=1)
+    assert r["reference_method"] == "EXHAUSTIVE_SIGNED_COSINE_NO_THRESHOLD"
+    assert r["denominators"]["exact_topk_neighbors"] == 1
+    assert r["per_query"][0]["exact_neighbor_count"] == 1
+    assert r["per_query"][0]["retained_neighbors"] == 0
+    assert r["exact_neighbor_retention_fraction"] == 0.0
+    assert r["top1_agreement_fraction"] == 0.0
+
+
+def test_exact_oracle_counts_zero_similarity_candidate_not_abstention():
+    idx = HierarchicalIndex([fact("orthogonal", [0, 1])],
+                            tenant_id="tenant-a", leaf_size=1)
+    r = compare_exact(idx, {"query": (1, 0)}, tenant_id="tenant-a",
+                      top_k=1, max_leaf_visits=1)
+    assert r["denominators"]["exact_topk_neighbors"] == 1
+    assert r["exact_neighbor_retention_fraction"] == 0.0
+
+
+def test_full_leaf_search_still_excludes_thresholded_neutral_candidates():
+    idx = HierarchicalIndex([fact("positive", [1, 0]), fact("neutral", [0, 1]),
+                             fact("negative", [-1, 0])],
+                            tenant_id="tenant-a", leaf_size=1)
+    r = compare_exact(idx, {"query": (1, 0)}, tenant_id="tenant-a",
+                      top_k=3, max_leaf_visits=idx.leaf_count)
+    assert r["denominators"]["exact_topk_neighbors"] == 3
+    assert r["exact_neighbor_retention_fraction"] == 0.3333
+    assert r["denominators"]["exact_scored_vectors"] == 3

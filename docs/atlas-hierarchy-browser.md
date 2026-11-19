@@ -13,7 +13,7 @@ Do not attach this demo directly to a11oy production routing.
   and a JSON backend API over **five synthetic 2D vectors only**. No JavaScript,
   database, private data, external endpoints, browser automation, inference or GPU.
 - Endpoint `GET /`: research form and actual selected vector IDs with retention
-  against the same-predicate exhaustive reference; mobile and desktop CSS.
+  against an exhaustive signed-cosine reference; mobile and desktop CSS.
 - Endpoint `GET /api/v1/hierarchy/evaluate?vector=%5B1%2C0%5D&top_k=3&leaves=2`:
   JSON state, SHA-256 of synthetic index and query, resource comparison denominators,
   explicit unverified permission/qualification flags.
@@ -48,10 +48,12 @@ when this module is merely imported.
   tests are not penetration testing or security certification.
 - This is **not AtlasKV model-attention integration**. No trained weights, neural
   embedding, KV cache, benchmark against the paper or quality claim.
-- Existing selector uses strict positive cosine threshold for BOTH the pruned
-  and exhaustive reference; therefore this is not unconstrained signed-cosine
-  top-k for negative similarities. No global absence can be inferred from pruning.
-  Record any changes to this inherited predicate in the parent research lane.
+- The selector uses a strict positive-cosine support threshold, while the v2
+  comparison reference scores **all signed-cosine neighbors**, including zero
+  and negative similarities. Full leaf traversal may still lose retained neighbors
+  because support-threshold filtering is separate from exact ranking. No global
+  absence or answer correctness follows from either run.
+  The reference update is scoped to an independently reviewed follow-up PR.
 - No real-user telemetry, analytics, logging of private queries or production
   treatment. The source and index digests are checksums, not signatures.
 - A successful API/healthz response does not qualify data rights or deployment.
@@ -102,3 +104,21 @@ The definition of production-ready is NOT satisfied here. It requires
 independent tenant and source authorization, measured held-out quality,
 a deployed governed backend, observable frontend, Cloudflare staged routing,
 immutable HF/CI receipts, and separately approved PyPI release.
+
+
+## 2026-11-19 follow-up: exact-cosine oracle correction
+
+The previous v1 comparator accidentally treated a full-leaf selector run with
+`min_similarity=0` as the full-neighbor oracle. That excluded all zero/negative
+cosine neighbors from its denominator, making some missing-neighbor errors
+invisible. The v2 comparator computes exact cosine against every fixed vector,
+with descending score and stable ID tie-breaks, while leaving the selection
+threshold unchanged. It reports lower retention when the support filter refuses
+otherwise valid exact nearest neighbors. New negative-only, orthogonal and
+full-leaf threshold regressions preserve that evidence. This changes evaluation
+semantics; earlier v1 receipts must never be relabeled v2 without rerunning.
+
+The WSGI application no longer imports the local socket server at module import
+(only the explicit CLI `main()` does). This reduces a Python Worker packaging
+hazard; it does **not** demonstrate Cloudflare Pyodide compatibility or provide
+an authenticated Worker adapter.

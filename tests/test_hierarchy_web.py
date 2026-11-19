@@ -68,7 +68,7 @@ def test_query_changes_rank_and_budget_controls_scored_count():
     assert first["selection"]["scored_facts"] == 1
     assert full["selection"]["scored_facts"] == 5
     assert full["selection"]["exhaustive"] is True
-    assert full["fidelity"]["neighbor_retention_fraction"] == 1.0
+    assert full["fidelity"]["neighbor_retention_fraction"] == 0.6667
 
 
 def test_fidelity_reports_denominators_and_does_not_claim_production():
@@ -147,3 +147,12 @@ def test_demo_cannot_access_external_projects_or_load_models():
     assert all(not path.startswith("https://") for path in (
         fact.source_uri for fact in INDEX._facts
     ))
+
+
+def test_true_signed_cosine_reference_is_visible_in_api_contract():
+    result = json.loads(api(vector="[1,0]", top_k="3",
+                            leaves=str(INDEX.leaf_count))[2])
+    assert result["selection"]["exhaustive"] is True
+    assert result["fidelity"]["neighbor_retention_fraction"] < 1.0
+    assert result["fidelity"]["reference_scored_vectors"] == 5
+    assert "including zero/negative neighbors" in result["limits"]
