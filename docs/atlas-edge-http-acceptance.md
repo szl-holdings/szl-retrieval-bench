@@ -10,7 +10,7 @@ This additive change attaches two bounded entrypoints to the existing source:
   listener on an ephemeral port inside the GitHub Actions job, tests the actual
   HTML/JSON/405/400/503 responses, then closes and joins its thread. No daemon,
   controller, scheduler, external network or model process remains.
-- `src/szl_retrieval_bench/edge_worker.py` adapts the same WSGI callable using
+- `src/atlas_worker.py` (outside the publishable Python package) adapts the same WSGI callable using
   Cloudflare's documented `workers.wsgi.entrypoint(application)`. The adapter
   intentionally relies on the Cloudflare `workers` runtime; it is not used by
   normal CPython imports. A stub unit test checks the delegation only.

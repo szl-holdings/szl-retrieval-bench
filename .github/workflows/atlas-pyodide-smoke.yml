@@ -12,7 +12,7 @@ on:
       - "src/szl_retrieval_bench/hierarchical.py"
       - "src/szl_retrieval_bench/hierarchical_eval.py"
       - "src/szl_retrieval_bench/hierarchy_web.py"
-      - "src/szl_retrieval_bench/edge_worker.py"
+      - "src/atlas_worker.py"
   workflow_dispatch:
 
 permissions:
