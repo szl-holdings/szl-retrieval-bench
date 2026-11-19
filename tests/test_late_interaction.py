@@ -5,12 +5,12 @@ from copy import deepcopy
 
 import pytest
 
+from szl_retrieval_bench import late_interaction
 from szl_retrieval_bench.admission import AXES
-from szl_retrieval_bench.late_interaction import (
-    MAX_DIM,
-    MAX_DOCS,
-    evaluate_late_interaction,
-)
+
+MAX_DIM = late_interaction.MAX_DIM
+MAX_DOCS = late_interaction.MAX_DOCS
+evaluate_late_interaction = late_interaction.evaluate_late_interaction
 
 EX = (1.0, 0.0)
 EY = (0.0, 1.0)
@@ -258,12 +258,10 @@ def test_no_positive_judgments_are_blocked_not_reported_as_zeros():
 def test_fault_injected_numeric_overflow_is_invalid_not_a_crash(monkeypatch):
     # The actual finite input bounds avoid ordinary overflow; inject the
     # numerical failure to prove this public API never escapes with partial data.
-    import szl_retrieval_bench.late_interaction as module
-
     def overflow(_values):
         raise OverflowError("synthetic numeric fault - do not echo values")
 
-    monkeypatch.setattr(module.math, "fsum", overflow)
+    monkeypatch.setattr(late_interaction.math, "fsum", overflow)
     result = evaluate()
     assert result == {
         "state": "INVALID",
