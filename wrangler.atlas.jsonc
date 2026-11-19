@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "szl-atlas-hierarchy-research",
+  "main": "src/szl_retrieval_bench/edge_worker.py",
+  "compatibility_date": "2026-11-19",
+  "compatibility_flags": ["python_workers"],
+  "workers_dev": false,
+  "routes": [],
+  "observability": {
+    "enabled": false
+  }
+}
