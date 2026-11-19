@@ -51,10 +51,15 @@ jobs:
           node --version
           python --version
           uv --version
+          # Pywrangler currently discovers a standard wrangler.jsonc filename.
+          # Copy only inside this disposable CI checkout, preserving the reviewed
+          # source config name and bytes in GitHub. No deploy or account access.
+          cp wrangler.atlas.jsonc wrangler.jsonc
+          cmp wrangler.atlas.jsonc wrangler.jsonc
           # This starts only a local test server within the ephemeral CI runner.
           # Pin both Cloudflare tooling packages; never invoke deploy.
           uv run --python 3.13 --with 'workers-py==1.17.9' --with 'workers-runtime-sdk==1.9.6' \
-            pywrangler dev --config wrangler.atlas.jsonc --ip 127.0.0.1 --port 8787 \
+            pywrangler dev --ip 127.0.0.1 --port 8787 \
             > "${RUNNER_TEMP}/atlas-pyodide.log" 2>&1 &
           atlas_pid=$!
           cleanup() {
