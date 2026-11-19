@@ -169,7 +169,7 @@ class HierarchicalIndex:
         return node_id
 
     def select(self, query: Sequence[float], *, tenant_id: str, top_k: int = 10,
-               max_leaf_visits: int = 8, min_similarity: float = 0.0) -> dict:
+               max_leaf_visits: int = 1, min_similarity: float = 0.0) -> dict:
         if tenant_id != self.tenant_id:
             raise IndexRefused("query tenant does not match index tenant")
         if (type(top_k) is not int or not 1 <= top_k <= 100 or

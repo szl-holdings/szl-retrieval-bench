@@ -143,3 +143,10 @@ def test_paired_fidelity_rejects_empty_or_invalid_queries():
     for queries in ({}, {"q": (1,)}, {"": (1, 0)}, {"q": (float("nan"), 0)}):
         with pytest.raises(IndexRefused):
             compare_exact(idx, queries, tenant_id="tenant-a")
+
+
+def test_one_fact_index_works_with_default_query_budget():
+    idx = HierarchicalIndex([fact("only", [1, 0])], tenant_id="tenant-a")
+    result = idx.select([1, 0], tenant_id="tenant-a")
+    assert result["ranking"][0]["fact_id"] == "only"
+    assert result["exhaustive"] is True
