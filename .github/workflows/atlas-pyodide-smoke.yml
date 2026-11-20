@@ -1,0 +1,144 @@
+name: atlas-pyodide-smoke
+
+# Bounded source-only Cloudflare workerd/Pyodide compatibility check.
+# No Cloudflare account, API token, deployed Worker, route, or DNS action.
+on:
+  pull_request:
+    branches: [main, "research/atlas-*"]
+    paths:
+      - ".github/workflows/atlas-pyodide-smoke.yml"
+      - "wrangler.atlas.jsonc"
+      - "pyproject.toml"
+      - "src/szl_retrieval_bench/hierarchical.py"
+      - "src/szl_retrieval_bench/hierarchical_eval.py"
+      - "src/szl_retrieval_bench/hierarchy_web.py"
+      - "src/atlas_worker.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-pyodide-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  local-workerd:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reviewed source without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install isolated CPython runtime
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Install pinned uv into this ephemeral runner
+        run: python -m pip install --disable-pip-version-check "uv==0.13.9"
+      - name: Run real workerd/Pyodide HTTP smoke without Cloudflare credentials
+        env:
+          UV_NO_PROGRESS: "1"
+          WRANGLER_SEND_METRICS: "false"
+          PYWRANGLER_SEND_METRICS: "false"
+          UV_CACHE_DIR: ${{ runner.temp }}/atlas-uv-cache
+          PYTHONUNBUFFERED: "1"
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node --version
+          python --version
+          uv --version
+          # Pywrangler currently discovers a standard wrangler.jsonc filename.
+          # Copy only inside this disposable CI checkout, preserving the reviewed
+          # source config name and bytes in GitHub. No deploy or account access.
+          cp wrangler.atlas.jsonc wrangler.jsonc
+          cmp wrangler.atlas.jsonc wrangler.jsonc
+          # This starts only a local test server within the ephemeral CI runner.
+          # Pin both Cloudflare tooling packages; never invoke deploy.
+          uv run --python 3.13 --with 'workers-py==1.17.9' --with 'workers-runtime-sdk==1.9.6' \
+            pywrangler dev --ip 127.0.0.1 --port 8787 \
+            > "${RUNNER_TEMP}/atlas-pyodide.log" 2>&1 &
+          atlas_pid=$!
+          cleanup() {
+            kill "$atlas_pid" 2>/dev/null || true
+            wait "$atlas_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          python - <<'PY'
+          import json
+          import sys
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+          
+          root = "http://127.0.0.1:8787"
+          def get(path, method="GET"):
+              request = Request(root + path, method=method)
+              try:
+                  with urlopen(request, timeout=3) as response:
+                      return response.status, response.headers, response.read()
+              except HTTPError as error:
+                  return error.code, error.headers, error.read()
+          
+          error = None
+          for attempt in range(40):
+              try:
+                  code, headers, raw = get("/healthz")
+                  if code == 200:
+                      payload = json.loads(raw)
+                      assert payload["qualified"] is False
+                      assert payload["provider_connected"] is False
+                      break
+                  error = f"unexpected health status {code}"
+              except (URLError, TimeoutError, OSError, ValueError) as exc:
+                  error = type(exc).__name__
+              time.sleep(1.5)
+          else:
+              raise SystemExit(f"Pyodide startup/health failed; last error: {error}")
+          
+          code, headers, raw = get("/")
+          assert code == 200, (code, raw[:250])
+          assert headers.get("Cache-Control") == "no-store"
+          assert b"Knowledge Atlas" in raw
+          code, headers, raw = get("/api/v1/hierarchy/evaluate?vector=%5B1%2C0%5D&top_k=3&leaves=2")
+          assert code == 200, (code, raw[:250])
+          data = json.loads(raw)
+          assert data["status"] == "SYNTHETIC_RESEARCH_ONLY"
+          assert data["qualified"] is False and data["training_executed"] is False
+          assert data["selection"]["ranking"][0]["fact_id"] == "north"
+          code, _, raw = get("/readyz")
+          assert code == 503 and json.loads(raw)["status"] == "NOT_PRODUCTION_READY"
+          code, _, raw = get("/", method="POST")
+          assert code == 405
+          code, _, raw = get("/api/v1/hierarchy/evaluate?vector=%5BNaN%2C0%5D")
+          assert code == 400
+          print("PYODIDE_WORKER_LOCAL_SMOKE_PASS", flush=True)
+          PY
+      - name: Redacted bounded local workerd startup diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+          path = Path(os.environ["RUNNER_TEMP"]) / "atlas-pyodide.log"
+          if path.is_file():
+              lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[-90:]
+              for row in lines:
+                  if re.search(r"(token|password|secret|authorization|cookie|api.key|credential)", row, re.I):
+                      print("[redacted diagnostic line]")
+                  else:
+                      print(row[:300])
+          else:
+              print("WORKER_LOG_UNAVAILABLE")
+          PY
+      - name: Summarize static gate (never proof of deployment)
+        if: always()
+        shell: bash
+        run: |
+          echo "No Cloudflare account interaction or deployment occurred." >> "$GITHUB_STEP_SUMMARY"
+          echo "A green local workerd/Pyodide smoke does not establish authentication, real tenant rights, hosted runtime, or production readiness." >> "$GITHUB_STEP_SUMMARY"
