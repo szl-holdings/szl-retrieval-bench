@@ -183,3 +183,39 @@ def test_full_leaf_search_still_excludes_thresholded_neutral_candidates():
     assert r["denominators"]["exact_topk_neighbors"] == 3
     assert r["exact_neighbor_retention_fraction"] == 0.3333
     assert r["denominators"]["exact_scored_vectors"] == 3
+
+
+def test_metadata_byte_budget_rejects_oversized_source_uri():
+    # Fact count / vector dimensions alone did not bound caller metadata.
+    with pytest.raises(IndexRefused, match="metadata.*budget"):
+        HierarchicalIndex([fact("a", [1, 0], source_uri="x" * 9000)],
+                          tenant_id="tenant-a")
+
+
+def test_metadata_byte_budget_counts_utf8_bytes_not_characters():
+    # A 4-byte codepoint must count as four source bytes.
+    with pytest.raises(IndexRefused, match="metadata.*budget"):
+        HierarchicalIndex([fact("a", [1, 0], source_uri="🔥" * 2200)],
+                          tenant_id="tenant-a")
+
+
+def test_metadata_rejects_invalid_surrogate_before_snapshot_hashing():
+    with pytest.raises(IndexRefused, match="valid UTF-8"):
+        HierarchicalIndex([fact("a", [1, 0], source_uri="\ud800")],
+                          tenant_id="tenant-a")
+
+
+def test_permission_scopes_count_is_bounded():
+    scopes = ("retrieval_evaluation",) + tuple("scope" for _ in range(16))
+    with pytest.raises(IndexRefused, match="bounded"):
+        HierarchicalIndex([fact("a", [1, 0], permission_scopes=scopes)],
+                          tenant_id="tenant-a")
+
+
+def test_near_budget_valid_metadata_preserves_non_authority():
+    idx = HierarchicalIndex([fact("a", [1, 0], source_uri="x" * 7900)],
+                            tenant_id="tenant-a")
+    out = idx.select([1, 0], tenant_id="tenant-a")
+    assert out["observation_authority"] == "CALLER_DECLARED_UNVERIFIED"
+    assert out["deployment_qualified"] is False
+    assert out["ranking"][0]["fact_id"] == "a"
