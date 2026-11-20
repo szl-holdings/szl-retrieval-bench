@@ -19,8 +19,7 @@ implemented independently, with source-specific attribution below.
 | Qwen / China | [Qwen3 Embedding/Reranker](https://github.com/QwenLM/Qwen3-Embedding), [paper](https://arxiv.org/abs/2506.05176) | Separate ranking from reranking evaluation; future multilingual matched cohorts | This module loads no Qwen weights, produces no multilingual model measurement |
 | LG AI Research / South Korea | [EXAONE Deep](https://github.com/LG-AI-EXAONE/EXAONE-Deep), [K-EXAONE](https://github.com/LG-AI-EXAONE/K-EXAONE-2.0) | Treat math/coding/reasoning benchmark claims as external baselines, not direct comparators | No EXAONE weights, no Korea-language benchmark run |
 | Research Ireland ADAPT, TCD | [GrOWL-RAG ontology-guided document relation extraction](https://www.adaptcentre.ie/news-and-events/adapt-at-trinity-college-dublin-researchers-paper-accepted-at-semantics-2025/) | Type and lineage should constrain retrieval separately from relevance | No ontology reasoning engine built or claims about Re-DocRED |
-| University of Galway / Insight | [Knowledge graph extraction, linking and maintenance]
-(https://www.universityofgalway.ie/dsi/knowledge_graphs/) | Keep evidence source IDs and derivation status separate from semantic rank | No entity-linking model or proprietary Irish archive ingestion |
+| University of Galway / Insight | [Knowledge graph extraction, linking and maintenance](https://www.universityofgalway.ie/dsi/knowledge_graphs/) | Keep evidence source IDs and derivation status separate from semantic rank | No entity-linking model or proprietary Irish archive ingestion |
 | Stanford Future Data / US | [ColBERTv2](https://aclanthology.org/2022.naacl-main.272/), [source](https://github.com/stanford-futuredata/ColBERT) | Compute bounded token-level MaxSim from synthetic vectors | No residual compression, PLAID engine, ColBERT tokenization or neural weights |
 | Independent retrieval study | [Token importance in multi-vector retrieval](https://arxiv.org/abs/2511.16106) | Paired unweighted versus positive query-token importance | No claimed recall improvement absent independent held-out data |
 | Microsoft Research / US | [GraphRAG](https://github.com/microsoft/graphrag), [query methods](https://github.com/microsoft/graphrag/blob/main/docs/query/overview.md) | Evaluate graph-aware candidate generation separately in a later cohort | No expensive LLM indexing or inference launched |
@@ -44,8 +43,7 @@ S_weighted(Q,D) = sum_i w_i * m_i(D)
 
 The same cosine matrix is reused for both arms; there is no double inference.
 Rank by descending unrounded score, then ascending document ID. Negative
-cosine similarity remains negative. Scores are NOT 
-probabilities or confidence.
+cosine similarity remains negative. Scores are NOT probabilities or confidence.
 
 With `n` query tokens, `d` vector dimensions and document lengths
 `m_j`, the deterministic operation counter is:
@@ -90,8 +88,7 @@ No statistical advantage can be inferred.
   document tokens/doc, 128 dimensions, 4096 judged IDs and 4 million scalar
   products; finite vectors and strictly positive finite weights required.
 * Reject duplicate token/document IDs, ragged/zero vectors, nonfinite values,
-  zero/negative importance, bad cutoffs, malfor
-med evidence and over-budget
+  zero/negative importance, bad cutoffs, malformed evidence and over-budget
   work. On invalid inputs emit only a stable code, not any partial metrics.
 * SHA-256 bindings cover source ID, inputs, weights, qrels and optional
   declared evidence. Change detection is reproducible; authenticity requires

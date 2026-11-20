@@ -63,8 +63,7 @@ def test_weighted_importance_improves_rank_on_a_public_synthetic_fixture():
         "token_normalizations": 4,
         "pairs_shared_between_arms": True,
     }
-    assert r["s
-igned_receipt_verified"] is False
+    assert r["signed_receipt_verified"] is False
     assert r["production_admitted"] is False
     assert r["training_ready"] is False
 
@@ -114,8 +113,7 @@ def test_work_budget_exact_boundary_and_one_less_fails_before_metrics():
     assert a["state"] == "EVALUATED_OFFLINE"
     assert b == {
         "state": "BLOCKED",
-        "reason_code": "OPERATION_BUDGET_EXCEED
-ED",
+        "reason_code": "OPERATION_BUDGET_EXCEEDED",
         "training_ready": False,
     }
 
@@ -164,8 +162,7 @@ def test_input_arguments_are_not_mutated():
         inp[1],
         inp[2],
         evidence_flags=inp[3],
-        source_revision="synthetic-public-v1"
-,
+        source_revision="synthetic-public-v1",
     )
     assert inp == before
 
@@ -222,8 +219,7 @@ def test_input_arguments_are_not_mutated():
             ]
         },
         {"qrels": {"B": -1}},
-        {"qrels": {"B": True
-}},
+        {"qrels": {"B": True}},
         {"qrels": {"B": float("inf")}},
         {"k": 0},
         {"k": True},
