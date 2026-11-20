@@ -26,7 +26,7 @@ MAX_K = 128
 MAX_SCALAR_PRODUCTS = 4_000_000
 MAX_VALUE = 1e9
 MAX_IMPORTANCE = 1e4
-_MAX_SOURCE_ID = re.compile("^[A-Za-z0-9._/@:+-]{1,128}$")
+_MAX_SOURCE_ID = re.compile(r"^[A-Za-z0-9._/@:+-]{1,128}$")
 _METRICS = ("R_precision", "mrr", "map")
 
 
@@ -59,12 +59,13 @@ def _number(value, *, maximum=MAX_VALUE, positive=False):
 
 
 def _sequence(value, *, minimum=1, maximum):
-    if type(value) is not in (list, tuple) or not minimum <= len(value) <= maximum:
+    if type(value) not in (list, tuple) or not minimum <= len(value) <= maximum:
         raise _BadInput("INVALID_SEQUENCE_BOUND")
     return value
 
 
-def _token(token, *, weighted, dimension=None):
+def _token(to
+ken, *, weighted, dimension=None):
     if type(token) is not dict or set(token) != (
         {"token_id", "vector", "importance"} if weighted else {"token_id", "vector"}
     ):
@@ -125,6 +126,7 @@ def _flags(flags, docs):
     if type(flags) is not dict or set(flags) != set(docs):
         raise _BadInput("EVIDENCE_SET_MISMATCH")
     result = {}
+
     for doc in sorted(docs):
         row = flags[doc]
         if type(row) is not dict or set(row) != set(AXES):
@@ -184,7 +186,8 @@ def _snapshot(
     return query, docs, labels, evidence, dim, scalar_ops
 
 
-def _evaluate_late_interaction_impl(
+def _e
+valuate_late_interaction_impl(
     query_tokens,
     documents,
     qrels,
@@ -244,7 +247,8 @@ def _evaluate_late_interaction_impl(
 
     unweighted = sorted(docs, key=lambda doc: (-similarities[doc]["unweighted"], doc))
     weighted = sorted(docs, key=lambda doc: (-similarities[doc]["weighted"], doc))
-    base = evaluate_run(unweighted, labels, k=k)
+    base = evaluate_run(unweighted, lab
+els, k=k)
     candidate = evaluate_run(weighted, labels, k=k)
     if base.get("state") != "MEASURED" or candidate.get("state") != "MEASURED":
         return {
@@ -302,7 +306,8 @@ def _evaluate_late_interaction_impl(
         "schema": SCHEMA,
         "state": "EVALUATED_OFFLINE",
         "source_revision": source_revision,
-        "provenance": "CALLER_SUPPLIED_UNVERIFIED",
+        "provenance": "CALLER_SU
+PPLIED_UNVERIFIED",
         "signed_receipt_verified": False,
         "training_ready": False,
         "production_admitted": False,
@@ -359,7 +364,8 @@ def evaluate_late_interaction(
             k=k,
             max_scalar_products=max_scalar_products,
             evidence_flags=evidence_flags,
-        )
+    
+    )
     except (ArithmeticError, ValueError):
         return {
             "state": "INVALID",
