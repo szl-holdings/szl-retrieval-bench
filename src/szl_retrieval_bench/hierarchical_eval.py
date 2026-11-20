@@ -8,9 +8,9 @@ whether a pruned hierarchical selector retains exact-cosine top-k neighbors.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from .hierarchical import HierarchicalIndex, IndexRefused, _sha_json, _unit
+from .hierarchical import HierarchicalIndex, IndexRefused, _dot, _sha_json, _unit
 
-SCHEMA = "szl.retrieval-bench.hierarchical-fidelity/v1"
+SCHEMA = "szl.retrieval-bench.hierarchical-fidelity/v2"
 MAX_QUERIES = 1000
 
 
@@ -33,11 +33,19 @@ def compare_exact(index: HierarchicalIndex, queries: Mapping[str, tuple[float, .
     total_scored = 0
     total_exact = 0
     for qid, vector in snapshot:
+        # Pruned candidate selection uses an explicit strict-positive support
+        # threshold. The reference MUST rank all facts on signed cosine, with
+        # no threshold and no hierarchical selection; otherwise negative/zero
+        # neighbors vanish from the oracle and inflate measured fidelity.
         approximate = index.select(vector, tenant_id=tenant_id, top_k=top_k,
-                                   max_leaf_visits=max_leaf_visits)
-        exact = index.select(vector, tenant_id=tenant_id, top_k=top_k,
-                             max_leaf_visits=index.leaf_count)
-        oracle_ids = [item["fact_id"] for item in exact["ranking"]]
+                                   max_leaf_visits=max_leaf_visits,
+                                   min_similarity=0.0)
+        all_scores = sorted(
+            ((_dot(vector, emb), fact.fact_id)
+             for fact, emb in zip(index._facts, index._vectors)),
+            key=lambda pair: (-pair[0], pair[1]),
+        )
+        oracle_ids = [fact_id for _, fact_id in all_scores[:top_k]]
         candidate_ids = [item["fact_id"] for item in approximate["ranking"]]
         overlap = len(set(candidate_ids) & set(oracle_ids))
         total_oracle += len(oracle_ids)
@@ -45,16 +53,18 @@ def compare_exact(index: HierarchicalIndex, queries: Mapping[str, tuple[float, .
         top1_hits += int(bool(oracle_ids and candidate_ids and
                               oracle_ids[0] == candidate_ids[0]))
         total_scored += approximate["scored_facts"]
-        total_exact += exact["scored_facts"]
+        total_exact += len(index._facts)
         results.append({"query_id": qid, "exact_neighbor_count": len(oracle_ids),
                         "retained_neighbors": overlap,
                         "top1_equal": bool(oracle_ids and candidate_ids and
                                            oracle_ids[0] == candidate_ids[0]),
                         "approximate_scored_facts": approximate["scored_facts"],
-                        "exact_scored_facts": exact["scored_facts"]})
+                        "exact_scored_facts": len(index._facts)})
     return {
         "schema": SCHEMA,
         "state": "MEASURED_OFFLINE_PROXY",
+        "reference_method": "EXHAUSTIVE_SIGNED_COSINE_NO_THRESHOLD",
+        "candidate_method": "HIERARCHICAL_COSINE_STRICT_POSITIVE",
         "model_executed": False,
         "evaluation_of_answer_quality": False,
         "observation_authority": "CALLER_DECLARED_UNVERIFIED",
@@ -68,5 +78,5 @@ def compare_exact(index: HierarchicalIndex, queries: Mapping[str, tuple[float, .
         "exact_neighbor_retention_fraction": (round(retained / total_oracle, 4)
                                               if total_oracle else None),
         "per_query": results,
-        "limits": "Offline fidelity to exact cosine on supplied vectors; no held-out answer labels, model execution, validated rights or training qualification.",
+        "limits": "Offline signed-cosine reference scores every supplied vector including zero/negative similarities; pruned selector uses a strict-positive support threshold, so full leaf visitation does not ensure 100% reference retention. Neither mode verifies source rights, model quality, training or deployment.",
     }
