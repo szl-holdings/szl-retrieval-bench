@@ -21,6 +21,8 @@ SCHEMA = "szl.retrieval-bench.hierarchical-offline/v1"
 MAX_FACTS = 2048
 MAX_DIMS = 1024
 MAX_NODES_VISITED = 8192
+MAX_FACT_METADATA_BYTES = 8192
+MAX_PERMISSION_SCOPES = 16
 SHA256_RE = re.compile(r"[a-f0-9]{64}\Z")
 
 
@@ -107,10 +109,26 @@ class HierarchicalIndex:
                 raise IndexRefused("source and license identity required")
             if not isinstance(fact.source_sha256, str) or not SHA256_RE.fullmatch(fact.source_sha256):
                 raise IndexRefused("source SHA-256 must be lowercase hex")
+            # Prevent caller-declared, untrusted metadata from bypassing the
+            # index's vector/fact bounds during snapshot JSON serialization.
+            # This is a resource bound, NOT a source-rights or hash check.
             if (not isinstance(fact.permission_scopes, tuple) or
+                    len(fact.permission_scopes) > MAX_PERMISSION_SCOPES or
                     "retrieval_evaluation" not in fact.permission_scopes or
-                    any(not isinstance(scope, str) for scope in fact.permission_scopes)):
-                raise IndexRefused("retrieval_evaluation permission required")
+                    any(
+                        not isinstance(scope, str)
+                        for scope in fact.permission_scopes
+                    )):
+                raise IndexRefused("bounded retrieval_evaluation scopes required")
+            try:
+                declared_bytes = sum(len(value.encode("utf-8")) for value in (
+                    fact.fact_id, fact.tenant_id, fact.source_uri,
+                    fact.source_revision, fact.source_sha256, fact.license_id,
+                    *fact.permission_scopes))
+            except UnicodeEncodeError as exc:
+                raise IndexRefused("metadata must be valid UTF-8") from exc
+            if declared_bytes > MAX_FACT_METADATA_BYTES:
+                raise IndexRefused("fact metadata UTF-8 byte budget exceeded")
             if any(getattr(fact, axis) != "PASS" for axis in
                    ("integrity", "freshness", "derivation", "rights")):
                 raise IndexRefused("four caller-declared PASS axes required")
