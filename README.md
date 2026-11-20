@@ -23,6 +23,12 @@ hash-chained receipts.
 Doctrine: a benchmark that cannot run returns `BLOCKED` with a reason.
 It never fabricates a metric. Run states: `MEASURED | BLOCKED | INVALID | FAILED`.
 
+An optional [offline extractive citation control](docs/extractive-citation-control.md)
+rejects invented artifact IDs, invalid byte spans and altered quoted text against
+hash-consistent **caller-declared** evidence. It does not verify factual truth,
+source identity, inference quality or eliminate general model hallucinations.
+It has no production model, Cloudflare, or Hugging Face runtime integration.
+
 ## Install and verify
 
 ```
