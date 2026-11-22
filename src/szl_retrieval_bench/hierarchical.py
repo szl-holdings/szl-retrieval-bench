@@ -120,15 +120,27 @@ class HierarchicalIndex:
                         for scope in fact.permission_scopes
                     )):
                 raise IndexRefused("bounded retrieval_evaluation scopes required")
+            # Count the actual JSON-escaped UTF-8 string representation.
+            # Raw bytes underestimate NUL, newline, quote and backslash data
+            # before _sha_json serializes the snapshot. Each field's encoded
+            # length is a lower bound on its serialized JSON representation.
+            metadata_values = (
+                fact.fact_id, fact.tenant_id, fact.source_uri,
+                fact.source_revision, fact.source_sha256, fact.license_id,
+                *fact.permission_scopes,
+            )
+            declared_bytes = 0
             try:
-                declared_bytes = sum(len(value.encode("utf-8")) for value in (
-                    fact.fact_id, fact.tenant_id, fact.source_uri,
-                    fact.source_revision, fact.source_sha256, fact.license_id,
-                    *fact.permission_scopes))
+                for value in metadata_values:
+                    if len(value) > MAX_FACT_METADATA_BYTES:
+                        raise IndexRefused("fact metadata JSON byte budget exceeded")
+                    declared_bytes += len(json.dumps(
+                        value, ensure_ascii=False, allow_nan=False
+                    ).encode("utf-8"))
+                    if declared_bytes > MAX_FACT_METADATA_BYTES:
+                        raise IndexRefused("fact metadata JSON byte budget exceeded")
             except UnicodeEncodeError as exc:
                 raise IndexRefused("metadata must be valid UTF-8") from exc
-            if declared_bytes > MAX_FACT_METADATA_BYTES:
-                raise IndexRefused("fact metadata UTF-8 byte budget exceeded")
             if any(getattr(fact, axis) != "PASS" for axis in
                    ("integrity", "freshness", "derivation", "rights")):
                 raise IndexRefused("four caller-declared PASS axes required")

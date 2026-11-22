@@ -219,3 +219,25 @@ def test_near_budget_valid_metadata_preserves_non_authority():
     assert out["observation_authority"] == "CALLER_DECLARED_UNVERIFIED"
     assert out["deployment_qualified"] is False
     assert out["ranking"][0]["fact_id"] == "a"
+
+
+@pytest.mark.parametrize("escaped_source", [
+    "\x00" * 1400,  # JSON uses six bytes per NUL rather than one raw byte.
+    "x" + "\n" * 4500,  # Newlines expand to two bytes in the snapshot.
+    "\\" * 4500,  # Backslashes are escaped when hashed.
+    '"' * 4500,  # Quotes are escaped when hashed.
+])
+def test_metadata_budget_rejects_serialization_amplification(escaped_source):
+    # Each candidate is below the raw UTF-8 budget but exceeds the
+    # serialized metadata budget used by _sha_json.
+    assert len(escaped_source.encode("utf-8")) < 8192
+    with pytest.raises(IndexRefused, match="metadata.*budget"):
+        HierarchicalIndex([fact("a", [1, 0], source_uri=escaped_source)],
+                          tenant_id="tenant-a")
+
+
+def test_metadata_budget_rejects_escaped_permission_scopes():
+    scopes = ("retrieval_evaluation", "\x00" * 1400)
+    with pytest.raises(IndexRefused, match="metadata.*budget"):
+        HierarchicalIndex([fact("a", [1, 0], permission_scopes=scopes)],
+                          tenant_id="tenant-a")

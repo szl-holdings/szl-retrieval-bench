@@ -13,9 +13,11 @@ digest serializer uses these strings unmodified; a single already-accepted
 fact could amplify memory and serialization work without breaking the
 fact-count or vector-dimension limits.
 
-**Patch:** a total limit of 8,192 UTF-8 metadata bytes per fact and at most
-16 permission-scope declarations. Invalid Unicode is explicitly refused
-before snapshot serialization. Limits are source-only research resource
+**Patch:** a total limit of 8,192 JSON-escaped UTF-8 bytes across
+the metadata string values per fact (including their JSON string quotes),
+and at most 16 permission-scope declarations. Raw UTF-8 byte counts
+underestimate JSON control-character and quote/backslash escaping. Invalid
+Unicode is explicitly refused before snapshot serialization. Limits are source-only research resource
 bounds; they do not verify source content, right to use data, signature
 identity, or whether the declared source revision is truly immutable.
 
@@ -32,7 +34,10 @@ Run with the checked-out source on the local Python path:
 python -m pytest -q tests/test_hierarchical.py
 ```
 
-On BETTERWITHAGE, `32 passed` with an explicitly set local src path.
+Prior baseline on BETTERWITHAGE: `32 passed` with an explicitly set local src path.
+The follow-up adds synthetic control-character/quote/backslash adversarial
+tests for the serialized bound; the exact-head hosted suite remains the
+release evidence authority.
 The new tests reject: 9,000 ASCII source bytes, 2,200 four-byte Unicode
 codepoints, an invalid surrogate, and 17 scope entries; a 7,900-byte
 ordinary fixture remains admissible, with `deployment_qualified=false`.
