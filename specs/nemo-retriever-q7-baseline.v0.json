@@ -1,0 +1,55 @@
+{
+  "caps": {
+    "perDayUsd": 500,
+    "perDayUusd": 500000000,
+    "perMonthUsd": 5000,
+    "perMonthUusd": 5000000000,
+    "perRunUsd": 100,
+    "perRunUusd": 100000000
+  },
+  "embedder": {
+    "amaruLicenseCheck": "PENDING",
+    "hfApiLicense": "other",
+    "hfApiLicenseLink": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+    "hfApiLicenseName": "nvidia-open-model-license",
+    "hfRepoId": "nvidia/llama-nemotron-embed-1b-v2",
+    "hfRevision": "113abe4acafa848e77ead9c0623205e511932348",
+    "licenseObservedOn": "2026-11-27",
+    "namedOpenLicense": true,
+    "role": "candidate",
+    "selectedForScoring": false
+  },
+  "excluded": [
+    {
+      "hfApiLicense": "cc-by-nc-4.0",
+      "hfRepoId": "nvidia/NV-Embed-v2",
+      "reason": "NONCOMMERCIAL_LICENSE"
+    }
+  ],
+  "launch": false,
+  "launchAuthorized": false,
+  "launcher": "saywa",
+  "launcherImplementation": "UNKNOWN",
+  "metrics": null,
+  "ngcContainer": false,
+  "providers": [
+    "massed",
+    "salad"
+  ],
+  "q7Corpus": "UNKNOWN",
+  "reason": "Q7_CORPUS_UNKNOWN",
+  "reranker": {
+    "amaruLicenseCheck": "PENDING",
+    "hfApiLicense": "other",
+    "hfApiLicenseLink": "https://openmdw.ai/license/1-1/",
+    "hfApiLicenseName": "openmdw-1.1",
+    "hfRepoId": "nvidia/llama-nemotron-rerank-1b-v2",
+    "hfRevision": "828765652b05bd439c9789d2a6d093db1caa1443",
+    "licenseObservedOn": "2026-11-27",
+    "namedOpenLicense": false,
+    "role": "recorded-not-selected",
+    "selectedForScoring": false
+  },
+  "schema": "szl.nemo-retriever-q7-baseline/v0",
+  "state": "BLOCKED"
+}
